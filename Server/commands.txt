@@ -1,0 +1,4 @@
+Server Command Handling:
+The server side sets or retrieves commands using the /command/<machine_id> endpoint.
+POST updates the current command for a specific machine.
+GET retrieves the current command for the machine.
