@@ -25,8 +25,8 @@ This project provides a **keylogger system** for monitoring activity such as key
 ### Server Setup:
 1. Clone this repository:
    ```bash
-   git clone <repository-url>
-   cd <repository-folder>
+   git clone <[https://github.com/hibakhalidm/Keylogger.git]>
+   cd <keylogger>
    ```
 
 2. Install dependencies:
@@ -47,7 +47,7 @@ This project provides a **keylogger system** for monitoring activity such as key
 - Uploaded files are located in the configured `UPLOAD_FOLDER`.
 - Example folder structure:
   ```
-  UPLOAD_FOLDER/
+  Server/Upload/
       Machine1/
           encrypted_keylog.txt
           encrypted_clipboard.txt
